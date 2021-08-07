@@ -50,17 +50,23 @@ eval "$(pyenv virtualenv-init -)"
 
 # Check if virtual environment exists:
 echov -n "Checking if virtual environment $venvname exists ..."
-if ! pyenv virtualenvs --bare | grep -q "$venvname"; then
-	echov " does not exist!"
-	echo "ERROR: $venvname does not exist" >&2
-	exit 2
-fi
-echov " does exist!"
-
-# Get Python Version of the venv
-echov -n "Getting Python version of $venvname ..."
-venvpyversion=$(pyenv virtualenvs --bare | grep "$venvname" | grep 'envs' | awk -F'/' '{ print $1 }')
-echov " $venvpyversion"
+case $(pyenv virtualenvs --bare | grep -c "$venvname") in
+	0)	echov " does not exist!"
+		echo "ERROR: $venvname does not exist" >&2
+		exit 2
+		;;
+	1)	echov " exists and is a system venv"
+		venvpyversion='system'
+		;;
+	2)	echov " exists and is a pyenv venv"
+		echov -n "Getting Python version of $venvname ..."
+		venvpyversion=$(pyenv virtualenvs --bare | grep "$venvname" | grep 'envs' | awk -F'/' '{ print $1 }')
+		echov " $venvpyversion"
+		;;
+	*)  echo "The envorionment $venvname seems to exists in an odd way. Please check the output of 'pyenv virtualenvs'!'" >&2
+		exit 97
+		;;
+esac
 
 # Check if equal
 if [[ "$reqpyversion" == "<check>" ]]; then
