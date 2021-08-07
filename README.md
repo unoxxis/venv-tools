@@ -7,3 +7,5 @@ A collection of scripts to manage virtual environments using [pyenv](https://git
 Check if the virtual environment uses the correct python version
 
 Usage `venv-version-check <venv> <target version>`. Returns `0` on correct version, and `1` on incorrect version and `2` if `venv` does not exist.
+
+If `<target version>` is omitted, print python version of `<venv>` to stdout.
