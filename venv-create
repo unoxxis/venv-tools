@@ -1,0 +1,50 @@
+#!/bin/bash
+
+# This script creates a virtual environment for a specified python version. 
+# It ensures that the python version requested is installed.
+
+if [[ "$1" == '-v' ]] || [[ "$1" == '--verbose' ]]; then
+	verbose=1
+	shift
+fi
+
+if [[ $# -ne 2 ]]; then
+	echo
+	echo "usage: $0 [-v] venv-name py-version"
+	exit 99
+fi
+
+function echov() {
+	[[ "$verbose" == "1" ]] && echo "$@"
+}
+
+venvname="$1"
+echov "venv-name:  $venvname"
+reqpyversion="$2"
+echov "py-version: $reqpyversion"
+
+# Set up pyenv and pyenv-virtualenv
+echov "Checking for pyenv..."
+if ! command -v pyenv 1>/dev/null 2>&1; then
+	echo 'pyenv and pyenv-virtualenv are required for this script!' >&2
+	echo 'Please see https://github.com/pyenv/pyenv and https://github.com/pyenv/pyenv-virtualenv' >&2
+	exit 98
+fi
+echov "Activating pyenv..."
+eval "$(pyenv init -)"
+eval "$(pyenv virtualenv-init -)"
+
+# Install the Python version, if not already installed
+echov -n "Checking for python version $reqpyversion ..."
+if pyenv versions --bare | grep -q "$reqpyversion"; then
+	echov " already installed."
+else
+	echov " will be installed."
+	pyenv install --skip-existing "$reqpyversion"
+fi
+
+echo "Creating virtual environment <$venvname>..."
+pyenv virtualenv "$reqpyversion" "$venvname"
+
+echov "DONE"
+exit 0

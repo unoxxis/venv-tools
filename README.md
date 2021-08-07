@@ -11,4 +11,7 @@ Usage `venv-version-check <venv> <target version>`. Returns `0` on correct versi
 If `<target version>` is omitted, print python version of `<venv>` to stdout.
 
 ### venv-create
-Creates a virtual environment for a specified python version and 
+Creates a virtual environment for a specified python version and name. Ensures that the
+python version requested is installed.
+
+Usage `venv-create <venv> <target version>`
