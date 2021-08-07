@@ -1,0 +1,63 @@
+#!/bin/bash
+
+# This script checks whether a specified virtual environment is based 
+# on the specified python version
+# Return values are
+# 0 - if versions match
+# 1 - if versions mismatch
+# 2 - if virtual envirnoment does not exist (also prints to stderr)
+
+if [[ "$1" == '-v' ]] || [[ "$1" == '--verbose' ]]; then
+	verbose=1
+	shift
+fi
+
+if [[ $# -lt 2 ]] || [[ $# -gt 4 ]]; then
+	echo
+	echo "usage: $0 [-v] venv-name py-version"
+	exit 99
+fi
+
+function echov() {
+	[[ "$verbose" == "1" ]] && echo "$@"
+}
+
+venvname="$1"
+echov "venv-name:  $venvname"
+reqpyversion="$2"
+echov "py-version: $reqpyversion"
+
+# Set up pyenv and pyenv-virtualenv
+echov "Checking for pyenv..."
+if ! command -v pyenv 1>/dev/null 2>&1; then
+	echo 'pyenv and pyenv-virtualenv are required for this script!' >&2
+	echo 'Please see https://github.com/pyenv/pyenv and https://github.com/pyenv/pyenv-virtualenv' >&2
+	exit 98
+fi
+echov "Activating pyenv..."
+eval "$(pyenv init -)"
+eval "$(pyenv virtualenv-init -)"
+
+# Check if virtual environment exists:
+echov -n "Checking if virtual environment $venvname exists ..."
+if ! pyenv virtualenvs --bare | grep -q "$venvname"; then
+	echov " does not exist!"
+	echo "ERROR: $venvname does not exist" >&2
+	exit 2
+fi
+echov " does exist!"
+
+# Get Python Version of the venv
+echov -n "Getting Python version of $venvname ..."
+venvpyversion=$(pyenv virtualenvs --bare | grep "$venvname" | grep 'envs' | awk -F'/' '{ print $1 }')
+echov " $venvpyversion"
+
+# Check if equal
+echov -n "Checking if <$venvpyversion> == <$reqpyversion> ... "
+if [[ "$venvpyversion" == "$reqpyversion" ]]; then
+	echov "YES"
+	exit 0
+else
+	echov "NO"
+	exit 1
+fi
