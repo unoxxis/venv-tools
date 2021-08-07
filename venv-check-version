@@ -6,15 +6,21 @@
 # 0 - if versions match
 # 1 - if versions mismatch
 # 2 - if virtual envirnoment does not exist (also prints to stderr)
+#
+# If the specified python version is ommitted, the script returns 0 (or 2) and
+# prints the python version number. Not recommended together with -v
+
 
 if [[ "$1" == '-v' ]] || [[ "$1" == '--verbose' ]]; then
 	verbose=1
 	shift
 fi
 
-if [[ $# -lt 2 ]] || [[ $# -gt 4 ]]; then
+if [[ $# -lt 1 ]] || [[ $# -gt 3 ]]; then
 	echo
-	echo "usage: $0 [-v] venv-name py-version"
+	echo "usage: $0 [-v] venv-name [py-version]"
+	echo "With only venv-name, return the python version of this virtual environment."
+	echo "With venv-nname and py-version, check that the virtual environment has the correct version."
 	exit 99
 fi
 
@@ -24,7 +30,11 @@ function echov() {
 
 venvname="$1"
 echov "venv-name:  $venvname"
-reqpyversion="$2"
+if [[ $# -lt 2 ]]; then
+	reqpyversion="<check>"
+else
+	reqpyversion="$2"
+fi
 echov "py-version: $reqpyversion"
 
 # Set up pyenv and pyenv-virtualenv
@@ -53,11 +63,16 @@ venvpyversion=$(pyenv virtualenvs --bare | grep "$venvname" | grep 'envs' | awk 
 echov " $venvpyversion"
 
 # Check if equal
-echov -n "Checking if <$venvpyversion> == <$reqpyversion> ... "
-if [[ "$venvpyversion" == "$reqpyversion" ]]; then
-	echov "YES"
+if [[ "$reqpyversion" == "<check>" ]]; then
+	echo $venvpyversion
 	exit 0
 else
-	echov "NO"
-	exit 1
+	echov -n "Checking if <$venvpyversion> == <$reqpyversion> ... "
+	if [[ "$venvpyversion" == "$reqpyversion" ]]; then
+		echov "YES"
+		exit 0
+	else
+		echov "NO"
+		exit 1
+	fi
 fi
