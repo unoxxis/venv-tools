@@ -11,13 +11,13 @@
 # If the specified python version is ommitted, the script returns 0 (or 2) and
 # prints the python version number. Not recommended together with -v
 
-function usage() {
+usage() {
 	echo "usage: $0 [-v] venv-name [py-version]"
 	echo "With only venv-name, return the python version of this virtual environment."
 	echo "With venv-nname and py-version, check that the virtual environment has the correct version."
 }
 
-function echov() {
+echov() {
 	[[ "$verbose" == "1" ]] && echo "$@"
 }
 
@@ -49,6 +49,7 @@ if ! command -v pyenv 1>/dev/null 2>&1; then
 	exit 98
 fi
 echov "Activating pyenv..."
+PYENV_VIRTUALENV_VERBOSE_ACTIVATE=
 eval "$(pyenv init -)"
 eval "$(pyenv virtualenv-init -)"
 

@@ -4,11 +4,11 @@
 # This script creates a virtual environment for a specified python version. 
 # It ensures that the python version requested is installed.
 
-function usage() {
+usage() {
 	echo "usage: $0 [-v] venv-name py-version"
 }
 
-function echov() {
+echov() {
 	[[ "$verbose" == "1" ]] && echo "$@"
 }
 
@@ -35,11 +35,12 @@ if ! command -v pyenv 1>/dev/null 2>&1; then
 	exit 98
 fi
 echov "Activating pyenv..."
+PYENV_VIRTUALENV_VERBOSE_ACTIVATE=
 eval "$(pyenv init -)"
 eval "$(pyenv virtualenv-init -)"
 
 # Install the Python version, if not already installed
-if [["$reqpyversion" != "system"]]; then
+if [[ "$reqpyversion" != "system" ]]; then
 	echov -n "Checking for python version $reqpyversion ..."
 	if pyenv versions --bare | grep -q "$reqpyversion"; then
 		echov " already installed."
