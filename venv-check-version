@@ -11,6 +11,15 @@
 # If the specified python version is ommitted, the script returns 0 (or 2) and
 # prints the python version number. Not recommended together with -v
 
+function usage() {
+	echo "usage: $0 [-v] venv-name [py-version]"
+	echo "With only venv-name, return the python version of this virtual environment."
+	echo "With venv-nname and py-version, check that the virtual environment has the correct version."
+}
+
+function echov() {
+	[[ "$verbose" == "1" ]] && echo "$@"
+}
 
 if [[ "$1" == '-v' ]] || [[ "$1" == '--verbose' ]]; then
 	verbose=1
@@ -18,16 +27,10 @@ if [[ "$1" == '-v' ]] || [[ "$1" == '--verbose' ]]; then
 fi
 
 if [[ $# -lt 1 ]] || [[ $# -gt 3 ]]; then
-	echo
-	echo "usage: $0 [-v] venv-name [py-version]"
-	echo "With only venv-name, return the python version of this virtual environment."
-	echo "With venv-nname and py-version, check that the virtual environment has the correct version."
+	usage
 	exit 99
 fi
 
-function echov() {
-	[[ "$verbose" == "1" ]] && echo "$@"
-}
 
 venvname="$1"
 echov "venv-name:  $venvname"
