@@ -39,12 +39,14 @@ eval "$(pyenv init -)"
 eval "$(pyenv virtualenv-init -)"
 
 # Install the Python version, if not already installed
-echov -n "Checking for python version $reqpyversion ..."
-if pyenv versions --bare | grep -q "$reqpyversion"; then
-	echov " already installed."
-else
-	echov " will be installed."
-	pyenv install --skip-existing "$reqpyversion"
+if [["$reqpyversion" != "system"]]; then
+	echov -n "Checking for python version $reqpyversion ..."
+	if pyenv versions --bare | grep -q "$reqpyversion"; then
+		echov " already installed."
+	else
+		echov " will be installed."
+		pyenv install --skip-existing "$reqpyversion"
+	fi
 fi
 
 echo "Creating virtual environment <$venvname>..."
