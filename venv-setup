@@ -1,0 +1,187 @@
+#!/bin/bash
+
+# venv-setup
+# This script sets up a virtual environment using a specified python version and
+# fills it with the given requirements.
+
+usage() {
+	echo "usage: $0 [-vu] [-n venv-name] [-p py-version] [-r requirements.txt [-r req2.txt...]]"
+	echo
+	echo "If any of -np are omitted, they will be asked interactively."
+	echo
+	echo "-A|--reinstall-ask       Ask what to do if python versions mismatch (default)."
+	echo "-h|--help                Show usage information."
+	echo "-n|--venv-name NAME      Name of the virtual environment to create"
+	echo "-N|--reinstall-no        Do not reinstall environment on wrong python version."
+	echo "-p|--python-version VER  Version of python to be based on. Defaults to 'system'"
+	echo "-r|--requirements FILE   Install the requirements from FILE with pip,"
+	echo "                         can be given mutliple times. Defaults to none (empty venv)"
+	echo "-u|--update-pip          Update pip to the latest version"
+	echo "-v|--verbose             Increase verbosity (up to two times)"
+	echo "-y|--reinstall-yes       Reinstall virtual environment on wrong python version."
+}
+
+echov() {
+	[[ $verbose -ge 1 ]] && echo "$@"
+}
+
+echovv() {
+	[[ $verbose -ge 2 ]] && echo "$@"
+}
+
+SCRIPT_PATH="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+
+### ARGUMENT PARSING
+
+# Defaults
+venvname=
+pyversion='system'
+reqfiles=()
+verbose=0
+updatepip=
+reinstall="ask"
+
+while [ "$1" != "" ]; do
+	case $1 in
+		-A | --reinstall-ask )
+			reinstall="ask"
+			;;
+		-h | --help )
+			usage
+			exit 0
+			;;
+		-n | --venv-name )
+			shift
+			venvname="$1"
+			;;
+		-N | --reinstall-no )
+			reinstall="no"
+			;;
+		-p | --python-version )
+			shift
+			pyversion="$1"
+			;;
+		-r | --requirements )
+			shift
+			reqfiles+=( "$1" )
+			;;
+		-u | --update-pip )
+			updatepip=1
+			;;
+		-v | --verbose )
+			((verbose+=1))
+			;;
+		-vv )
+			((verbose+=2))
+			;;
+		-y | --reinstall-yes )
+			reinstall="yes"
+			;;
+		*)
+			echo "Invalid argument '$1'" >&2
+			usage
+			exit 1
+	esac
+	shift
+done
+
+if [[ $verbose -ge 1 ]]; then
+	verbosechar="-v"
+else
+	verbosechar=""
+fi
+
+# Fill missing values interactively
+if [[ "$venvname" == "" ]]; then
+	echovv "No venv name available, query terminal interactively..."
+	read -p "Please enter the name of the virtual environment: " -r
+	if [[ "$REPLY" != "" ]]; then
+		echovv "Query done."
+		venvname="$REPLY"
+	else
+		echo "ERROR: A virtual environment name must be specified by using -n or interactively." >&2
+		exit 1
+	fi
+fi
+
+echov
+echovv "SCRIPT_PATH:  '$SCRIPT_PATH'"
+echovv
+echov "venv-name:    $venvname"
+echov "py-version:   $pyversion"
+echov "requirements: ${reqfiles[@]}"
+echovv "reinstall:    $reinstall"
+echovv "update-pip:   $updatepip"
+
+### ACTIVATE PYENV
+# Check for dependencies...
+echovv "Checking for pyenv..."
+if ! command -v pyenv 1>/dev/null 2>&1; then
+	echo 'pyenv and pyenv-virtualenv are required for this script!' >&2
+	echo 'Please see https://github.com/pyenv/pyenv and https://github.com/pyenv/pyenv-virtualenv' >&2
+	exit 1
+fi
+
+echovv
+echovv "Activating pyenv..."
+PYENV_VIRTUALENV_VERBOSE_ACTIVATE=
+eval "$(pyenv init -)"
+eval "$(pyenv virtualenv-init -)"
+
+### CREATE VIRTUAL ENVIRONMENT
+echov "Checking if virtual environment $venvname already exists..."
+if [[ $verbose -ge 2 ]]; then
+	./venv-check-version -v "$venvname" "$pyversion"
+elif [[ $erbose -ge 1 ]]; then
+	./venv-check-version "$venvname" "$pyversion"
+else
+	./venv-check-version "$venvname" "$pyversion" 1>/dev/null 2>&1
+fi
+case $? in
+	0)	echo "Virtual environment already exists and has correct python version."
+		createenv='no'
+		;;
+	1)  echo "Virtual environment already exists but is for a different python version $(./venv-tools/venv-check-version "$venvname")!"
+		# TODO Add an option to save and restore old version requirement data.
+		if [[ $reinstall == "ask" ]]; then
+			read -p "Reinstall with correct python version $pyversion [y|N]? " -n 1 -r
+			echo
+		fi
+		if [[ $reinstall == "yes" ]] || [[ $REPLY =~ ^[Yy]$ ]]; then
+			echov "Reinstalling with correct python version..."
+			echov "Deleting old virtual environment..."
+			pyenv virtualenv-delete "$venvname"
+			createenv='yes'
+		else
+			echo "WARNING: Reinstallation disabled!"
+			echo "The created virtual environment will have a non-matching python version."
+			echo
+			echo "The script will still try to install correct dependencies."
+			echo "However, it is not guaranteed that it will work if the versions"
+			echo "differ by substantial amount."
+			createenv='no'
+		fi
+		;;
+	2)	echov "Virtual environment does not exist and will be created."
+		createenv='yes'
+		;;
+	*)	echo "ERROR: An error occured when calling venv-check-version!" >&2
+		exit 2
+esac
+
+if [[ "$createenv" == "yes" ]]; then
+	$SCRIPT_PATH/venv-create $verbosechar "$venvname" "$pyversion"
+fi
+
+##### POPULATE VIRTUAL ENVIRONMENT
+echovv "Activate environment..."
+pyenv activate "$venvname"
+
+if [[ $updatepip != "" ]]; then
+	python -m pip install --upgrade pip
+fi
+
+echo "Installing requirements with pip..."
+# pip install -r requirements-dev.txt
+echo "Installing LSP server to dev venv for Sublime Text PyLSP..."
+# pip install "python-lsp-server[all]" python-lsp-black mypy-ls pyls-isort types-PyYAML

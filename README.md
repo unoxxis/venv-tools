@@ -15,3 +15,10 @@ Creates a virtual environment for a specified python version and name. Ensures t
 python version requested is installed.
 
 Usage `venv-create <venv> <target version>`
+
+### venv-setup
+Set up a virtual environment for a specific python version, and fill it with requirements.
+Can handle preexisting environments.
+
+Usage `venv-setup -n <venv> -p <py version> -r <reqs1.txt> -r <reqs2.txt>`
+More options see `venv-setup -h`.
