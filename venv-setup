@@ -10,6 +10,7 @@ usage() {
 	echo "If any of -np are omitted, they will be asked interactively."
 	echo
 	echo "-A|--reinstall-ask       Ask what to do if python versions mismatch (default)."
+	echo "                         Pass twice to also ask on correct version."
 	echo "-C|--clean-venv          Create a clean environment if existent. Equivalent to -R -d"
 	echo "-d|--discard-packages    Discard Packages on reinstallation."
 	echo "-h|--help                Show usage information."
@@ -48,11 +49,13 @@ updatepip=
 reinstall="ask"
 keeppackages="ask"
 sublimelspdeps=
+numa=0
 
 while [ "$1" != "" ]; do
 	case $1 in
 		-A | --reinstall-ask )
-			reinstall="ask"
+			((numa++))
+			[[ $numa -ge 2 ]] && reinstall="askask" || reinstall="ask"
 			;;
 		-C | --clean-venv )
 			reinstall="always"
@@ -176,7 +179,13 @@ else
 fi
 case $? in
 	0)	echo "Virtual environment already exists and has correct python version."
-		if [[ $reinstall == "always" ]]; then
+		REPLY=
+		if [[ $reinstall == "ask" ]]; then
+			echovv "Asking user whether to reinstall annyway..."
+			read -p "Reinstall anyway [y|N]? " -n 1 -r
+			echo
+		fi
+		if [[ $reinstall == "always" ]] || [[ $REPLY =~ ^[Yy]$ ]]; then
 			echov "Virtual environment forced to be reinstalled!"
 			deleteenv='yes'
 			createenv='yes'
@@ -186,7 +195,8 @@ case $? in
 		fi
 		;;
 	1)  echo "Virtual environment already exists but is for a different python version $(./venv-tools/venv-check-version "$venvname")!"
-		if [[ $reinstall == "ask" ]]; then
+		REPLY=
+		if [[ $reinstall == "ask"* ]]; then
 			echovv "Asking user whether to reinstall with correct python..."
 			read -p "Reinstall with correct python version $pyversion [y|N]? " -n 1 -r
 			echo
@@ -214,6 +224,7 @@ case $? in
 esac
 
 if [[ $deleteenv == 'yes' ]]; then
+	REPLY=
 	if [[ $keeppackages == "ask" ]]; then
 		echovv "Asking user whether to reinstall present packages..."
 		read -p "Reinstall present packages in new venv [y|N]? " -n 1 -r
