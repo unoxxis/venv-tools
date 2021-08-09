@@ -10,12 +10,18 @@ usage() {
 	echo "If any of -np are omitted, they will be asked interactively."
 	echo
 	echo "-A|--reinstall-ask       Ask what to do if python versions mismatch (default)."
+	echo "-C|--clean-venv          Create a clean environment if existent. Equivalent to -R -d"
+	echo "-d|--discard-packages    Discard Packages on reinstallation."
 	echo "-h|--help                Show usage information."
+	echo "-k|--keep-packages       Reinstall current packages if reinstalling with -y"
+	echo "-K|--keep-packages-ask   Ask whether to reinstall packages."
 	echo "-n|--venv-name NAME      Name of the virtual environment to create"
 	echo "-N|--reinstall-no        Do not reinstall environment on wrong python version."
 	echo "-p|--python-version VER  Version of python to be based on. Defaults to 'system'"
 	echo "-r|--requirements FILE   Install the requirements from FILE with pip,"
 	echo "                         can be given mutliple times. Defaults to none (empty venv)"
+	echo "-R|--reinstall-always    Allways reinstall an existing environment."
+	echo "-S|--sublime-lsp-deps    Add requirements for sublime text python LSP to the environment."
 	echo "-u|--update-pip          Update pip to the latest version"
 	echo "-v|--verbose             Increase verbosity (up to two times)"
 	echo "-y|--reinstall-yes       Reinstall virtual environment on wrong python version."
@@ -40,15 +46,30 @@ reqfiles=()
 verbose=0
 updatepip=
 reinstall="ask"
+keeppackages="ask"
+sublimelspdeps=
 
 while [ "$1" != "" ]; do
 	case $1 in
 		-A | --reinstall-ask )
 			reinstall="ask"
 			;;
+		-C | --clean-venv )
+			reinstall="always"
+			keeppackages="no"
+			;;
+		-d | --discard-packages )
+			keeppackages="no"
+			;;
 		-h | --help )
 			usage
 			exit 0
+			;;
+		-k | --keep-packages )
+			keeppackages="yes"
+			;;
+		-K | --keep-packages-ask )
+			keeppackages="ask"
 			;;
 		-n | --venv-name )
 			shift
@@ -63,7 +84,13 @@ while [ "$1" != "" ]; do
 			;;
 		-r | --requirements )
 			shift
-			reqfiles+=( "$1" )
+			reqfiles+=( "-r $1" )
+			;;
+		-R | --reinstall-always )
+			reinstall="always"
+			;;
+		-S | --sublime-lsp-deps )
+			sublimelspdeps="1"
 			;;
 		-u | --update-pip )
 			updatepip=1
@@ -85,10 +112,19 @@ while [ "$1" != "" ]; do
 	shift
 done
 
+# Unset tmpreqfile, will be filled in case requirements have to be trasferred
+tmpreqfile=
+
 if [[ $verbose -ge 1 ]]; then
 	verbosechar="-v"
 else
 	verbosechar=""
+fi
+
+# We want the LSP requirements last, therefore we add it here
+if [[ "$sublimelspdeps" == "1" ]]; then
+	echov "Adding Sublime Text local Python-LSP packages from '${SCRIPT_PATH}/requirements-sublime-lsp.txt'"
+	reqfiles+=( "-r ${SCRIPT_PATH}/requirements-sublime-lsp.txt" )
 fi
 
 # Fill missing values interactively
@@ -107,11 +143,12 @@ fi
 echov
 echovv "SCRIPT_PATH:  '$SCRIPT_PATH'"
 echovv
-echov "venv-name:    $venvname"
-echov "py-version:   $pyversion"
-echov "requirements: ${reqfiles[@]}"
-echovv "reinstall:    $reinstall"
-echovv "update-pip:   $updatepip"
+echov "venv-name:     $venvname"
+echov "py-version:    $pyversion"
+echov "requirements:  ${reqfiles[@]}"
+echovv "reinstall:     $reinstall"
+echovv "keep-packages: $keeppackages"
+echovv "update-pip:    $updatepip"
 
 ### ACTIVATE PYENV
 # Check for dependencies...
@@ -139,18 +176,23 @@ else
 fi
 case $? in
 	0)	echo "Virtual environment already exists and has correct python version."
-		createenv='no'
+		if [[ $reinstall == "always" ]]; then
+			echov "Virtual environment forced to be reinstalled!"
+			deleteenv='yes'
+			createenv='yes'
+		else
+			deleteenv='no'
+			createenv='no'
+		fi
 		;;
 	1)  echo "Virtual environment already exists but is for a different python version $(./venv-tools/venv-check-version "$venvname")!"
-		# TODO Add an option to save and restore old version requirement data.
 		if [[ $reinstall == "ask" ]]; then
+			echovv "Asking user whether to reinstall with correct python..."
 			read -p "Reinstall with correct python version $pyversion [y|N]? " -n 1 -r
 			echo
 		fi
 		if [[ $reinstall == "yes" ]] || [[ $REPLY =~ ^[Yy]$ ]]; then
-			echov "Reinstalling with correct python version..."
-			echov "Deleting old virtual environment..."
-			pyenv virtualenv-delete "$venvname"
+			deleteenv='yes'
 			createenv='yes'
 		else
 			echo "WARNING: Reinstallation disabled!"
@@ -159,15 +201,43 @@ case $? in
 			echo "The script will still try to install correct dependencies."
 			echo "However, it is not guaranteed that it will work if the versions"
 			echo "differ by substantial amount."
+			deleteenv='no'
 			createenv='no'
 		fi
 		;;
 	2)	echov "Virtual environment does not exist and will be created."
+		deleteenv='no'
 		createenv='yes'
 		;;
 	*)	echo "ERROR: An error occured when calling venv-check-version!" >&2
 		exit 2
 esac
+
+if [[ $deleteenv == 'yes' ]]; then
+	if [[ $keeppackages == "ask" ]]; then
+		echovv "Asking user whether to reinstall present packages..."
+		read -p "Reinstall present packages in new venv [y|N]? " -n 1 -r
+		echo
+	fi
+	if [[ $keeppackages == "yes" ]] || [[ $REPLY =~ ^[Yy]$ ]]; then
+		saveenv='yes'
+	else
+		saveenv='no'
+	fi
+fi
+
+if [[ $saveenv == "yes" ]]; then
+	tmpreqfile=$(mktemp /tmp/oldreqs-XXXXXXXXXX --suffix '.txt')
+	echovv "Activate environment..."
+	pyenv activate "$venvname"
+	echovv "Freezing old packages to $tmpreqfile..."
+	pip freeze > $tmpreqfile
+fi
+
+if [[ $deleteenv == 'yes' ]]; then
+	echov "Deleting old virtual environment..."
+	pyenv virtualenv-delete -f "$venvname"
+fi
 
 if [[ "$createenv" == "yes" ]]; then
 	$SCRIPT_PATH/venv-create $verbosechar "$venvname" "$pyversion"
@@ -177,11 +247,20 @@ fi
 echovv "Activate environment..."
 pyenv activate "$venvname"
 
+echov
+echov "Updating pip..."
 if [[ $updatepip != "" ]]; then
 	python -m pip install --upgrade pip
 fi
 
-echo "Installing requirements with pip..."
-# pip install -r requirements-dev.txt
-echo "Installing LSP server to dev venv for Sublime Text PyLSP..."
-# pip install "python-lsp-server[all]" python-lsp-black mypy-ls pyls-isort types-PyYAML
+if [[ "$tmpreqfile" != "" ]]; then
+	echov "Reinstalling frozen requirements with pip..."
+	pip install -r $tmpreqfile
+	rm -f $tmpreqfile
+fi
+
+if [[ "${#reqfiles}" -gt 0 ]]; then
+	echov
+	echov "Installing requirements with pip..."
+	pip install ${reqfiles[@]}
+fi
