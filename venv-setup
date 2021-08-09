@@ -171,16 +171,16 @@ eval "$(pyenv virtualenv-init -)"
 ### CREATE VIRTUAL ENVIRONMENT
 echov "Checking if virtual environment $venvname already exists..."
 if [[ $verbose -ge 2 ]]; then
-	./venv-check-version -v "$venvname" "$pyversion"
+	$SCRIPT_PATH/venv-check-version -v "$venvname" "$pyversion"
 elif [[ $erbose -ge 1 ]]; then
-	./venv-check-version "$venvname" "$pyversion"
+	$SCRIPT_PATH/venv-check-version "$venvname" "$pyversion"
 else
-	./venv-check-version "$venvname" "$pyversion" 1>/dev/null 2>&1
+	$SCRIPT_PATH/venv-check-version "$venvname" "$pyversion" 1>/dev/null 2>&1
 fi
 case $? in
 	0)	echo "Virtual environment already exists and has correct python version."
 		REPLY=
-		if [[ $reinstall == "ask" ]]; then
+		if [[ $reinstall == "askask" ]]; then
 			echovv "Asking user whether to reinstall annyway..."
 			read -p "Reinstall anyway [y|N]? " -n 1 -r
 			echo
